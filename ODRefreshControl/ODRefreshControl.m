@@ -29,6 +29,7 @@
 @interface ODRefreshControl ()
 
 @property (nonatomic, readwrite) BOOL refreshing;
+@property (nonatomic, readwrite) int forcedRefreshing;
 @property (nonatomic, assign) UIScrollView *scrollView;
 @property (nonatomic, assign) UIEdgeInsets originalContentInset;
 
@@ -37,6 +38,7 @@
 @implementation ODRefreshControl
 
 @synthesize refreshing = _refreshing;
+@synthesize forcedRefreshing = _forcedRefreshing;
 @synthesize tintColor = _tintColor;
 
 @synthesize scrollView = _scrollView;
@@ -74,6 +76,7 @@ static inline CGFloat lerp(CGFloat a, CGFloat b, CGFloat p)
         [self addSubview:_activity];
         
         _refreshing = NO;
+        _forcedRefreshing = 0;
         _canRefresh = YES;
         _ignoreInset = NO;
         _ignoreOffset = NO;
@@ -247,7 +250,7 @@ static inline CGFloat lerp(CGFloat a, CGFloat b, CGFloat p)
             _canRefresh = NO;
             dontDraw = YES;
         }
-        if (dontDraw) {
+        if (dontDraw || _forcedRefreshing) {
             _shapeLayer.path = nil;
             _shapeLayer.shadowPath = nil;
             _arrowLayer.path = nil;
@@ -260,6 +263,8 @@ static inline CGFloat lerp(CGFloat a, CGFloat b, CGFloat p)
     _lastOffset = offset;
     
     BOOL triggered = NO;
+    if (_forcedRefreshing)
+        return;
     
     CGMutablePathRef path = CGPathCreateMutable();
     
@@ -340,7 +345,7 @@ static inline CGFloat lerp(CGFloat a, CGFloat b, CGFloat p)
         [_highlightLayer setFillRule:kCAFillRuleNonZero];
         CGPathRelease(highlightPath);
         
-    } else {
+    } else if (!_forcedRefreshing) {
         // Start the shape disappearance animation
         
         CGFloat radius = lerp(kMinBottomRadius, kMaxBottomRadius, 0.2);
@@ -398,6 +403,7 @@ static inline CGFloat lerp(CGFloat a, CGFloat b, CGFloat p)
 - (void)beginRefreshing
 {
     if (!_refreshing) {
+        ++_forcedRefreshing;
         CABasicAnimation *alphaAnimation = [CABasicAnimation animationWithKeyPath:@"opacity"];
         alphaAnimation.duration = 0.0001;
         alphaAnimation.toValue = [NSNumber numberWithFloat:0];
@@ -407,14 +413,14 @@ static inline CGFloat lerp(CGFloat a, CGFloat b, CGFloat p)
         [_arrowLayer addAnimation:alphaAnimation forKey:nil];
         [_highlightLayer addAnimation:alphaAnimation forKey:nil];
         
-        _activity.alpha = 1;
-        _activity.layer.transform = CATransform3DMakeScale(1, 1, 1);
-
-        CGPoint offset = self.scrollView.contentOffset;
-        _ignoreInset = YES;
-        [self.scrollView setContentInset:UIEdgeInsetsMake(kOpenedViewHeight + self.originalContentInset.top, self.originalContentInset.left, self.originalContentInset.bottom, self.originalContentInset.right)];
-        _ignoreInset = NO;
-        [self.scrollView setContentOffset:offset animated:NO];
+        [UIView animateWithDuration:0.4 animations:^{
+            _activity.alpha = 1;
+            _activity.layer.transform = CATransform3DMakeScale(1, 1, 1);
+            _ignoreInset = YES;
+            [self.scrollView setContentInset:UIEdgeInsetsMake(kOpenedViewHeight + self.originalContentInset.top, self.originalContentInset.left, self.originalContentInset.bottom, self.originalContentInset.right)];
+            _ignoreInset = NO;
+            [self.scrollView setContentOffset:CGPointMake(0, -kOpenedViewHeight) animated:YES];
+        } completion:nil];
 
         self.refreshing = YES;
         _canRefresh = NO;
@@ -450,6 +456,8 @@ static inline CGFloat lerp(CGFloat a, CGFloat b, CGFloat p)
             _ignoreInset = YES;
             [blockScrollView setContentInset:self.originalContentInset];
             _ignoreInset = NO;
+            if (_forcedRefreshing > 0)
+                --_forcedRefreshing;
         }];
     }
 }
