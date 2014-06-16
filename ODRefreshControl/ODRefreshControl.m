@@ -462,4 +462,9 @@ static inline CGFloat lerp(CGFloat a, CGFloat b, CGFloat p)
     }
 }
 
++(CGFloat)openedViewHeight
+{
+	return kOpenedViewHeight;
+}
+
 @end

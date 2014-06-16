@@ -48,4 +48,6 @@
 // Tells the control the refresh operation has ended
 - (void)endRefreshing;
 
++(CGFloat)openedViewHeight;
+
 @end
